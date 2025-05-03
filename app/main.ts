@@ -12,11 +12,6 @@ udpSocket.bind(2053, "127.0.0.1");
 
 udpSocket.on("message", (data: Buffer, remoteAddr: dgram.RemoteInfo) => {
 	try {
-		if (data.length !== 12) {
-			throw new Error(
-				`Invalid DNS header length. Expected 12 bytes but received ${data.length} bytes.`
-			);
-		}
 		const parsedHeaderData: DNSHeaderType = {
 			pid: data.readUInt16BE(0),
 			qr: (data.readUInt16BE(2) >> 15) & 0x1,

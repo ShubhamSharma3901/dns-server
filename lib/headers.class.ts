@@ -2,7 +2,13 @@ import type { DNSHeaderType } from "../types/headers";
 export class DNSHeader {
 	private headerBuffer: Uint16Array = new Uint16Array(6);
 
-	constructor(data: DNSHeaderType) {
+	constructor() {}
+
+	/**
+	 * Writes the DNS header with the provided Buffer Data.
+	 * @param {DNSHeaderType}
+	 */
+	public writeHeader(data: DNSHeaderType) {
 		const flags =
 			(data.qr << 15) |
 			(data.opcode << 11) |
@@ -23,6 +29,10 @@ export class DNSHeader {
 		]);
 	}
 
+	/**
+	 * Returns the header buffer as a Buffer object.
+	 * @returns {Buffer} The header buffer.
+	 */
 	public getHeaderBuffer(): Buffer {
 		const buffer = Buffer.alloc(12);
 		this.headerBuffer.forEach((value, index) => {

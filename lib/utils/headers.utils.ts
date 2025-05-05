@@ -20,3 +20,37 @@ export const parseDNSHeader = (buffer: Buffer): DNSHeaderType => {
 
 	return parsedHeaderData;
 };
+
+export const parseDNSHeaderSelective = (buffer: Buffer): DNSHeaderType => {
+	const pid = buffer.readUInt16BE(0);
+	const qr = 1;
+	const opcode = (buffer.readUInt16BE(2) >> 11) & 0b00001111;
+	const aa = 0;
+	const tc = 0;
+	const rd = (buffer.readUInt16BE(2) >> 8) & 0x1;
+	const ra = 0;
+	const z = 0;
+	const rcode = opcode === 0 ? 0 : 4;
+	const qdcount = 1;
+	const ancount = 1;
+	const nscount = 0;
+	const arcount = 0;
+
+	const parsedHeaderData: DNSHeaderType = {
+		pid,
+		qr,
+		opcode,
+		aa,
+		tc,
+		rd,
+		ra,
+		z,
+		rcode,
+		qdcount,
+		ancount,
+		nscount,
+		arcount,
+	};
+
+	return parsedHeaderData;
+};

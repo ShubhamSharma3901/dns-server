@@ -7,6 +7,10 @@ import type { DNSAnswerType } from "../types/answers";
 import { DNSHeader } from "../classes/headers.class";
 import { DNSQuestion } from "../classes/questions.class";
 import { DNSAnswer } from "../classes/answers.class";
+import {
+	parseDNSHeader,
+	parseDNSHeaderSelective,
+} from "../lib/utils/headers.utils";
 
 console.log("Logs from the program:");
 
@@ -15,24 +19,9 @@ udpSocket.bind(2053, "127.0.0.1");
 
 udpSocket.on("message", (data: Buffer, remoteAddr: dgram.RemoteInfo) => {
 	try {
-		const headerData: DNSHeaderType = {
-			pid: 1234,
-			qr: 1,
-			opcode: 0,
-			aa: 0,
-			tc: 0,
-			rd: 0,
-			ra: 0,
-			z: 0,
-			rcode: 0,
-			qdcount: 1,
-			ancount: 1,
-			nscount: 0,
-			arcount: 0,
-		};
-
+		const parsedHeaderData = parseDNSHeaderSelective(data);
 		const header = new DNSHeader();
-		header.writeHeader(headerData);
+		header.writeHeader(parsedHeaderData);
 
 		const questions = new DNSQuestion();
 		questions.writeQuestion({

@@ -1,11 +1,12 @@
-//Lib Imports
+//Package Imports
 import * as dgram from "dgram";
 
 //Custom Imports
-import { DNSHeader } from "../lib/headers.class";
 import type { DNSHeaderType } from "../types/headers";
-import { parseDNSHeader } from "../lib/utils/headers.utils";
-import { DNSQuestion } from "../lib/questions.class";
+import type { DNSAnswerType } from "../types/answers";
+import { DNSHeader } from "../classes/headers.class";
+import { DNSQuestion } from "../classes/questions.class";
+import { DNSAnswer } from "../classes/answers.class";
 
 console.log("Logs from the program:");
 
@@ -14,8 +15,6 @@ udpSocket.bind(2053, "127.0.0.1");
 
 udpSocket.on("message", (data: Buffer, remoteAddr: dgram.RemoteInfo) => {
 	try {
-		const parsedHeaderData: DNSHeaderType = parseDNSHeader(data);
-
 		const headerData: DNSHeaderType = {
 			pid: 1234,
 			qr: 1,
@@ -27,7 +26,7 @@ udpSocket.on("message", (data: Buffer, remoteAddr: dgram.RemoteInfo) => {
 			z: 0,
 			rcode: 0,
 			qdcount: 1,
-			ancount: 0,
+			ancount: 1,
 			nscount: 0,
 			arcount: 0,
 		};
@@ -42,17 +41,35 @@ udpSocket.on("message", (data: Buffer, remoteAddr: dgram.RemoteInfo) => {
 			class: 1,
 		});
 
+		const answers = new DNSAnswer();
+		answers.writeAnswer({
+			name: "codecrafters.io",
+			type: 1,
+			class: 1,
+			ttl: 60,
+			length: 4,
+			data: "8.8.8.8",
+		});
+
 		const headerBuffer = header.getHeaderBuffer();
-		console.log("Header Buffer: ", headerBuffer);
-
 		const questionBuffer = questions.getQuestionBuffer();
+		const answerBuffer = answers.getAnswerBuffer();
+
+		// Generating the response by concatenating all the Packet Sections
+		// Header + Question + Answer + Authority + Additional
+		const response = Buffer.concat([
+			headerBuffer,
+			questionBuffer,
+			answerBuffer,
+		]);
+
+		console.log("Header Buffer: ", headerBuffer);
 		console.log("Question Buffer: ", questionBuffer);
-
+		console.log("Answer Buffer: ", answerBuffer);
 		console.log(`Received data from ${remoteAddr.address}:${remoteAddr.port}`);
-
-		const response = Buffer.concat([headerBuffer, questionBuffer]);
 		console.log(`Response: ${response}`);
 
+		// Send the response back to the client
 		udpSocket.send(response, remoteAddr.port, remoteAddr.address);
 	} catch (e) {
 		console.log(`Error sending data: ${e}`);

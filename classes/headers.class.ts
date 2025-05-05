@@ -7,8 +7,9 @@ export class DNSHeader {
 	/**
 	 * Writes the DNS header with the provided Buffer Data.
 	 * @param {DNSHeaderType}
+	 * @returns {void}
 	 */
-	public writeHeader(data: DNSHeaderType) {
+	public writeHeader(data: DNSHeaderType): void {
 		const flags =
 			(data.qr << 15) |
 			(data.opcode << 11) |

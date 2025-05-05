@@ -11,6 +11,8 @@ import {
 	parseDNSHeader,
 	parseDNSHeaderSelective,
 } from "../lib/utils/headers.utils";
+import { parseDNSQuestion } from "../lib/utils/questions.utils";
+import { parseDNSAnswer } from "../lib/utils/answers.utils";
 
 console.log("Logs from the program:");
 
@@ -20,25 +22,35 @@ udpSocket.bind(2053, "127.0.0.1");
 udpSocket.on("message", (data: Buffer, remoteAddr: dgram.RemoteInfo) => {
 	try {
 		const parsedHeaderData = parseDNSHeaderSelective(data);
+
+		//Parse DNS Question Section
+		// The question section starts after the header, which is 12 bytes long
+		const questionSectionOffset = 12;
+		const questionParsed = parseDNSQuestion(
+			data.subarray(questionSectionOffset)
+		);
+		const finalParsedQuestion = {
+			name: questionParsed.name,
+			type: questionParsed.type,
+			class: questionParsed.class,
+		};
+
+		// The parsed question length is the length of the name + 2 bytes for QTYPE + 2 bytes for QCLASS
+		const questionLengthInBytes = questionParsed.bytesUsed;
+
+		// The answer section starts after the question section at the below offset
+		const answerSectionOffset = questionSectionOffset + questionLengthInBytes;
+		// Parse DNS Answer Section
+		const parsedAnswerData = parseDNSAnswer(data.subarray(answerSectionOffset));
+
 		const header = new DNSHeader();
 		header.writeHeader(parsedHeaderData);
 
 		const questions = new DNSQuestion();
-		questions.writeQuestion({
-			name: "codecrafters.io",
-			type: 1,
-			class: 1,
-		});
+		questions.writeQuestion(finalParsedQuestion);
 
 		const answers = new DNSAnswer();
-		answers.writeAnswer({
-			name: "codecrafters.io",
-			type: 1,
-			class: 1,
-			ttl: 60,
-			length: 4,
-			data: "8.8.8.8",
-		});
+		answers.writeAnswer(parsedAnswerData);
 
 		const headerBuffer = header.getHeaderBuffer();
 		const questionBuffer = questions.getQuestionBuffer();

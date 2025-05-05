@@ -1,29 +1,22 @@
 import type { QuestionType } from "../../types/questions";
+import { parseDomainNameFromBuffer } from "./common.utils";
 
-export const parseDNSQuestion = (buffer: Buffer): QuestionType => {
+export const parseDNSQuestion = (
+	buffer: Buffer
+): QuestionType & { bytesUsed: number } => {
 	const question: QuestionType = {
 		name: "",
-		type: 0,
-		class: 0,
+		type: 1,
+		class: 1,
 	};
+	const parsedQuestionName = parseDomainNameFromBuffer(buffer);
+	question.name = parsedQuestionName.parsedName;
 
-	const labels: string[] = [];
-	let offset = 0;
-
-	while (offset < buffer.length - 4) {
-		// If we encounter the encoded Null Character, Break out from the Loop
-		const labelLength = buffer.readUInt8(offset);
-		if (labelLength === 0) {
-			break;
-		}
-
-		const label = buffer.subarray(offset + 1, offset + labelLength + 1);
-		labels.push(label.toString("utf-8"));
-		offset += labelLength + 1;
-	}
-
-	question.name = labels.join(".");
-	question.type = buffer.readUint16BE(offset);
-	question.class = buffer.readUint16BE(offset + 2);
-	return question;
+	// const offset = parsedQuestionName.offset;
+	// question.type = buffer.readUint16BE(offset);
+	// question.class = buffer.readUint16BE(offset + 2);
+	return {
+		...question,
+		bytesUsed: parsedQuestionName.offset + 4, // name + 2 bytes QTYPE + 2 bytes QCLASS
+	};
 };

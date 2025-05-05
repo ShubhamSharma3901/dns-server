@@ -1,17 +1,19 @@
 import type { DNSAnswerType } from "../../types/answers";
 import { parseDomainNameFromBuffer } from "./common.utils";
 
-export const parseDNSAnswer = (buffer: Buffer): DNSAnswerType => {
+export const parseDNSAnswer = (
+	buffer: Buffer,
+	offset: number,
+	name: string
+): DNSAnswerType => {
 	const answer: DNSAnswerType = {
-		name: "",
+		name: name,
 		type: 1,
 		class: 1,
 		ttl: 60,
 		length: 4,
 		data: "8.8.8.8",
 	};
-	const parsedAnswerName = parseDomainNameFromBuffer(buffer);
-	answer.name = parsedAnswerName.parsedName;
 
 	// const offset = parsedAnswerName.offset;
 	// answer.type = buffer.readUint16BE(offset);

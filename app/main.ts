@@ -41,7 +41,11 @@ udpSocket.on("message", (data: Buffer, remoteAddr: dgram.RemoteInfo) => {
 		// The answer section starts after the question section at the below offset
 		const answerSectionOffset = questionSectionOffset + questionLengthInBytes;
 		// Parse DNS Answer Section
-		const parsedAnswerData = parseDNSAnswer(data.subarray(answerSectionOffset));
+		const parsedAnswerData = parseDNSAnswer(
+			data,
+			answerSectionOffset,
+			finalParsedQuestion.name
+		);
 
 		const header = new DNSHeader();
 		header.writeHeader(parsedHeaderData);

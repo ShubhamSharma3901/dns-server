@@ -61,6 +61,7 @@ udpSocket.on("message", (data: Buffer, remoteAddr: dgram.RemoteInfo) => {
 		const header = new DNSHeader();
 		parsedHeaderData.qdcount = finalParsedQuestion.length;
 		parsedHeaderData.qr = 1;
+		parsedHeaderData.rcode = 4;
 		parsedHeaderData.ancount = generateAnswersFromParsedQuestions.length;
 		header.writeHeader(parsedHeaderData);
 		const headerBuffer = header.getHeaderBuffer();

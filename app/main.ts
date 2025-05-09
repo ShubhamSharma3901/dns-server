@@ -21,51 +21,69 @@ udpSocket.bind(2053, "127.0.0.1");
 
 udpSocket.on("message", (data: Buffer, remoteAddr: dgram.RemoteInfo) => {
 	try {
-		const parsedHeaderData = parseDNSHeaderSelective(data);
+		const parsedHeaderData = parseDNSHeader(data);
 
 		//Parse DNS Question Section
 		// The question section starts after the header, which is 12 bytes long
-		const questionSectionOffset = 12;
-		const questionParsed = parseDNSQuestion(
-			data.subarray(questionSectionOffset)
-		);
-		const finalParsedQuestion = {
-			name: questionParsed.name,
-			type: questionParsed.type,
-			class: questionParsed.class,
-		};
+		let questionSectionOffset = 12;
+		let parsedQuestions = [];
+		for (let i = 0; i < parsedHeaderData.qdcount; i++) {
+			// Parse DNS Question Section
+			const questionParsed = parseDNSQuestion(
+				data.subarray(questionSectionOffset)
+			);
+			parsedQuestions.push(questionParsed);
+			questionSectionOffset += questionParsed.bytesUsed;
+		}
 
-		// The parsed question length is the length of the name + 2 bytes for QTYPE + 2 bytes for QCLASS
-		const questionLengthInBytes = questionParsed.bytesUsed;
+		const finalParsedQuestion = parsedQuestions.map((questionParsed) => {
+			return {
+				name: questionParsed.name,
+				type: questionParsed.type,
+				class: questionParsed.class,
+			};
+		});
 
-		// The answer section starts after the question section at the below offset
-		const answerSectionOffset = questionSectionOffset + questionLengthInBytes;
 		// Parse DNS Answer Section
-		const parsedAnswerData = parseDNSAnswer(
-			data,
-			answerSectionOffset,
-			finalParsedQuestion.name
+		const generateAnswersFromParsedQuestions = finalParsedQuestion.map(
+			(questionParsed) => {
+				return {
+					name: questionParsed.name,
+					type: 1,
+					class: 1,
+					ttl: 60,
+					length: 4,
+					data: "8.8.8.8",
+				};
+			}
 		);
 
 		const header = new DNSHeader();
+		parsedHeaderData.qdcount = finalParsedQuestion.length;
+		parsedHeaderData.ancount = generateAnswersFromParsedQuestions.length;
 		header.writeHeader(parsedHeaderData);
+		const headerBuffer = header.getHeaderBuffer();
 
 		const questions = new DNSQuestion();
-		questions.writeQuestion(finalParsedQuestion);
+		const questionBuffer: Buffer[] = finalParsedQuestion.map((question) => {
+			questions.writeQuestion(question);
+			return questions.getQuestionBuffer();
+		});
 
 		const answers = new DNSAnswer();
-		answers.writeAnswer(parsedAnswerData);
-
-		const headerBuffer = header.getHeaderBuffer();
-		const questionBuffer = questions.getQuestionBuffer();
-		const answerBuffer = answers.getAnswerBuffer();
+		const answerBuffer: Buffer[] = generateAnswersFromParsedQuestions.map(
+			(answer) => {
+				answers.writeAnswer(answer);
+				return answers.getAnswerBuffer();
+			}
+		);
 
 		// Generating the response by concatenating all the Packet Sections
 		// Header + Question + Answer + Authority + Additional
 		const response = Buffer.concat([
 			headerBuffer,
-			questionBuffer,
-			answerBuffer,
+			...questionBuffer,
+			...answerBuffer,
 		]);
 
 		console.log("Header Buffer: ", headerBuffer);

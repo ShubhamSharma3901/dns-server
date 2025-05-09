@@ -1,102 +1,102 @@
-//Package Imports
+// ───────────────────── Package Imports ─────────────────────
 import * as dgram from "dgram";
 
-//Custom Imports
+// ───────────────────── Custom Imports ─────────────────────
 import type { DNSHeaderType } from "../types/headers";
 import type { DNSAnswerType } from "../types/answers";
 import { DNSHeader } from "../classes/headers.class";
 import { DNSQuestion } from "../classes/questions.class";
 import { DNSAnswer } from "../classes/answers.class";
-import {
-	parseDNSHeader,
-	parseDNSHeaderSelective,
-} from "../lib/utils/headers.utils";
+import { parseDNSHeader } from "../lib/utils/headers.utils";
 import { parseDNSQuestion } from "../lib/utils/questions.utils";
-import { parseDNSAnswer } from "../lib/utils/answers.utils";
 
-console.log("Logs from the program:");
+// ───────────────────── Server Setup ─────────────────────
+const udpSocket = dgram.createSocket("udp4");
+const PORT = 2053;
+const HOST = "127.0.0.1";
 
-const udpSocket: dgram.Socket = dgram.createSocket("udp4");
-udpSocket.bind(2053, "127.0.0.1");
+udpSocket.bind(PORT, HOST, () => {
+	console.log(`🚀 DNS server running at ${HOST}:${PORT}`);
+});
 
-udpSocket.on("message", (data: Buffer, remoteAddr: dgram.RemoteInfo) => {
+// ───────────────────── Message Handler ─────────────────────
+udpSocket.on("message", (data: Buffer, remote: dgram.RemoteInfo) => {
 	try {
-		const parsedHeaderData = parseDNSHeader(data);
+		console.log(
+			`\n📨 Received DNS query from ${remote.address}:${remote.port}`
+		);
 
-		//Parse DNS Question Section
-		// The question section starts after the header, which is 12 bytes long
-		let questionSectionOffset = 12;
-		let parsedQuestions = [];
-		for (let i = 0; i < parsedHeaderData.qdcount; i++) {
-			// Parse DNS Question Section
-			const questionParsed = parseDNSQuestion(
-				data.subarray(questionSectionOffset)
-			);
-			parsedQuestions.push(questionParsed);
-			questionSectionOffset += questionParsed.bytesUsed;
+		// ───── Step 1: Parse Header ─────
+		const parsedHeader = parseDNSHeader(data);
+		let offset = 12; // DNS header is 12 bytes
+		const questions = [];
+
+		// ───── Step 2: Parse All Questions ─────
+		for (let i = 0; i < parsedHeader.qdcount; i++) {
+			const {
+				name,
+				type,
+				class: qClass,
+				bytesUsed,
+			} = parseDNSQuestion(data.subarray(offset));
+			questions.push({ name, type, class: qClass });
+			offset += bytesUsed;
 		}
 
-		const finalParsedQuestion = parsedQuestions.map((questionParsed) => {
-			return {
-				name: questionParsed.name,
-				type: questionParsed.type,
-				class: questionParsed.class,
-			};
+		// ───── Step 3: Construct Fake Answer(s) ─────
+		const answers: DNSAnswerType[] = questions.map((q) => ({
+			name: q.name,
+			type: 1, // A record
+			class: 1, // IN
+			ttl: 60,
+			length: 4,
+			data: "8.8.8.8",
+		}));
+
+		// ───── Step 4: Construct Header for Response ─────
+		const responseHeader = new DNSHeader();
+		responseHeader.writeHeader({
+			...parsedHeader,
+			qr: 1, // Response
+			rd: 1, // Recursion Desired (copying from request)
+			ra: 1, // Recursion Available
+			rcode: 0, // NOERROR
+			ancount: answers.length,
+			nscount: 0,
+			arcount: 0,
+		});
+		const headerBuffer = responseHeader.getHeaderBuffer();
+
+		// ───── Step 5: Encode Question Section ─────
+		const questionBuffers = questions.map((q) => {
+			const question = new DNSQuestion();
+			question.writeQuestion(q);
+			return question.getQuestionBuffer();
 		});
 
-		// Parse DNS Answer Section
-		const generateAnswersFromParsedQuestions = finalParsedQuestion.map(
-			(questionParsed) => {
-				return {
-					name: questionParsed.name,
-					type: 1,
-					class: 1,
-					ttl: 60,
-					length: 4,
-					data: "8.8.8.8",
-				};
-			}
-		);
-
-		const header = new DNSHeader();
-		parsedHeaderData.qdcount = finalParsedQuestion.length;
-		parsedHeaderData.qr = 1;
-		parsedHeaderData.rcode = 4;
-		parsedHeaderData.ancount = generateAnswersFromParsedQuestions.length;
-		header.writeHeader(parsedHeaderData);
-		const headerBuffer = header.getHeaderBuffer();
-
-		const questionBuffer: Buffer[] = finalParsedQuestion.map((question) => {
-			const questions = new DNSQuestion();
-			questions.writeQuestion(question);
-			return questions.getQuestionBuffer();
+		// ───── Step 6: Encode Answer Section ─────
+		const answerBuffers = answers.map((ans) => {
+			const answer = new DNSAnswer();
+			answer.writeAnswer(ans);
+			return answer.getAnswerBuffer();
 		});
 
-		const answerBuffer: Buffer[] = generateAnswersFromParsedQuestions.map(
-			(answer) => {
-				const answers = new DNSAnswer();
-				answers.writeAnswer(answer);
-				return answers.getAnswerBuffer();
-			}
-		);
-
-		// Generating the response by concatenating all the Packet Sections
-		// Header + Question + Answer + Authority + Additional
+		// ───── Step 7: Send the Response ─────
 		const response = Buffer.concat([
 			headerBuffer,
-			...questionBuffer,
-			...answerBuffer,
+			...questionBuffers,
+			...answerBuffers,
 		]);
+		udpSocket.send(response, remote.port, remote.address);
 
-		console.log("Header Buffer: ", headerBuffer);
-		console.log("Question Buffer: ", questionBuffer);
-		console.log("Answer Buffer: ", answerBuffer);
-		console.log(`Received data from ${remoteAddr.address}:${remoteAddr.port}`);
-		console.log(`Response: ${response}`);
-
-		// Send the response back to the client
-		udpSocket.send(response, remoteAddr.port, remoteAddr.address);
-	} catch (e) {
-		console.log(`Error sending data: ${e}`);
+		// ───── Logs ─────
+		console.log("Parsed Questions:", questions);
+		console.log("Sent Response with", answers.length, "Answer(s)");
+		console.log("Response Buffer:", response);
+		console.log("Response Sent to:", remote.address, ":", remote.port);
+		console.log("Response Buffer Length:", response.length);
+		console.log("Response Buffer (UTF-8):", response.toString("utf-8"));
+	} catch (err) {
+		console.error("Error processing DNS query:", err);
 	}
 });

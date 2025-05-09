@@ -60,7 +60,7 @@ udpSocket.on("message", (data: Buffer, remote: dgram.RemoteInfo) => {
 			qr: 1, // Response
 			rd: 1, // Recursion Desired (copying from request)
 			ra: 1, // Recursion Available
-			rcode: 0, // NOERROR
+			rcode: 4, // Not Implemented
 			ancount: answers.length,
 			nscount: 0,
 			arcount: 0,

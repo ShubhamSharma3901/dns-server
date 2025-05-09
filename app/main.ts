@@ -58,8 +58,8 @@ udpSocket.on("message", (data: Buffer, remote: dgram.RemoteInfo) => {
 		responseHeader.writeHeader({
 			...parsedHeader,
 			qr: 1, // Response
-			rd: 1, // Recursion Desired (copying from request)
-			ra: 1, // Recursion Available
+			rd: 0, // Recursion Not Desired
+			ra: 0, // Recursion Not Available
 			rcode: 4, // Not Implemented
 			ancount: answers.length,
 			nscount: 0,

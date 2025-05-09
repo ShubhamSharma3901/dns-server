@@ -60,19 +60,20 @@ udpSocket.on("message", (data: Buffer, remoteAddr: dgram.RemoteInfo) => {
 
 		const header = new DNSHeader();
 		parsedHeaderData.qdcount = finalParsedQuestion.length;
+		parsedHeaderData.qr = 1;
 		parsedHeaderData.ancount = generateAnswersFromParsedQuestions.length;
 		header.writeHeader(parsedHeaderData);
 		const headerBuffer = header.getHeaderBuffer();
 
-		const questions = new DNSQuestion();
 		const questionBuffer: Buffer[] = finalParsedQuestion.map((question) => {
+			const questions = new DNSQuestion();
 			questions.writeQuestion(question);
 			return questions.getQuestionBuffer();
 		});
 
-		const answers = new DNSAnswer();
 		const answerBuffer: Buffer[] = generateAnswersFromParsedQuestions.map(
 			(answer) => {
+				const answers = new DNSAnswer();
 				answers.writeAnswer(answer);
 				return answers.getAnswerBuffer();
 			}

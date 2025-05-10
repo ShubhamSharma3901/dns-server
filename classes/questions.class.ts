@@ -9,15 +9,22 @@ export class DNSQuestion {
 	/**
 	 * Writes the DNS Question with the provided Buffer Data.
 	 * @param {QuestionType} question - The question object containing the name, type, and class.
+	 * @param {Map<string, number>} nameMap - Optional map for domain name compression
+	 * @param {number} offset - Current position in the overall message for compression
 	 * @returns {void}
 	 */
-	public writeQuestion(question: QuestionType): void {
-		const encodedName = encodeDomainName(question.name);
+	public writeQuestion(
+		question: QuestionType,
+		nameMap: Map<string, number> = new Map(),
+		offset: number = 0
+	): void {
+		// Use the enhanced encodeDomainName function with compression support
+		const encodedName = encodeDomainName(question.name, nameMap);
 
 		// Allocate buffer: encodedName length + 2 bytes for type + 2 for class
 		this.questionBuffer = Buffer.alloc(encodedName.length + 4);
 
-		// The buffer is allocated with the size of the encoded name plus 4 bytes (2 for type and 2 for class).
+		// Copy the compressed domain name
 		encodedName.copy(this.questionBuffer, 0);
 
 		// Write type (2 bytes)

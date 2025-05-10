@@ -1,22 +1,41 @@
-import type { QuestionType } from "../../types/questions";
+// questions.utils.ts - with compression support
+
 import { parseDomainNameFromBuffer } from "./common.utils";
+import type { QuestionType } from "../../types/questions";
 
-export const parseDNSQuestion = (
-	buffer: Buffer
-): QuestionType & { bytesUsed: number } => {
-	const question: QuestionType = {
-		name: "",
-		type: 1,
-		class: 1,
-	};
-	const parsedQuestionName = parseDomainNameFromBuffer(buffer);
-	question.name = parsedQuestionName.parsedName;
+/**
+ * Parses a DNS Question section from a buffer with compression support
+ * @param {Buffer} buffer - The buffer containing the question
+ * @param {Buffer} originalBuffer - Original message buffer for compression references
+ * @returns An object with parsed question and bytes used
+ */
+export function parseDNSQuestion(
+	buffer: Buffer,
+	originalBuffer: Buffer = buffer
+): {
+	name: string;
+	type: number;
+	class: number;
+	bytesUsed: number;
+} {
+	// Parse the domain name with compression support
+	const { parsedName, offset } = parseDomainNameFromBuffer(
+		buffer,
+		0,
+		originalBuffer
+	);
 
-	// const offset = parsedQuestionName.offset;
-	// question.type = buffer.readUint16BE(offset);
-	// question.class = buffer.readUint16BE(offset + 2);
+	// Read question type (2 bytes)
+	const type = buffer.readUInt16BE(offset);
+
+	// Read question class (2 bytes)
+	const qClass = buffer.readUInt16BE(offset + 2);
+
+	// Total bytes used = domain name + 2 bytes type + 2 bytes class
 	return {
-		...question,
-		bytesUsed: parsedQuestionName.offset + 4, // name + 2 bytes QTYPE + 2 bytes QCLASS
+		name: parsedName,
+		type,
+		class: qClass,
+		bytesUsed: offset + 4,
 	};
-};
+}

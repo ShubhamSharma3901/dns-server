@@ -9,6 +9,7 @@ import { DNSQuestion } from "../classes/questions.class";
 import { DNSAnswer } from "../classes/answers.class";
 import { parseDNSHeader } from "../lib/utils/headers.utils";
 import { parseDNSQuestion } from "../lib/utils/questions.utils";
+import type { QuestionType } from "../types/questions";
 
 // ───────────────────── Server Setup ─────────────────────
 const udpSocket = dgram.createSocket("udp4");
@@ -22,14 +23,14 @@ udpSocket.bind(PORT, HOST, () => {
 // ───────────────────── Message Handler ─────────────────────
 udpSocket.on("message", (data: Buffer, remote: dgram.RemoteInfo) => {
 	try {
-		console.log(
-			`\n📨 Received DNS query from ${remote.address}:${remote.port}`
-		);
+		console.log(`\nReceived DNS query from ${remote.address}:${remote.port}`);
 
 		// ───── Step 1: Parse Header ─────
-		const parsedHeader = parseDNSHeader(data);
+		const parsedHeader: DNSHeaderType = parseDNSHeader(data);
+		console.log("Parsed Header:", parsedHeader);
+
 		let offset = 12; // DNS header is 12 bytes
-		const questions = [];
+		const questions: QuestionType[] = [];
 
 		// ───── Step 2: Parse All Questions ─────
 		for (let i = 0; i < parsedHeader.qdcount; i++) {
@@ -38,12 +39,31 @@ udpSocket.on("message", (data: Buffer, remote: dgram.RemoteInfo) => {
 				type,
 				class: qClass,
 				bytesUsed,
-			} = parseDNSQuestion(data.subarray(offset));
+			} = parseDNSQuestion(data.subarray(offset), data);
 			questions.push({ name, type, class: qClass });
 			offset += bytesUsed;
 		}
 
-		// ───── Step 3: Construct Fake Answer(s) ─────
+		console.log("Parsed Questions:", questions);
+
+		// ───── Step 3: Construct Response Message ─────
+
+		// Create header for response
+		const responseHeader = new DNSHeader();
+		responseHeader.writeHeader({
+			...parsedHeader,
+			qr: 1, // Response
+			ancount: questions.length, // One answer per question
+			rcode: 0, // No error
+		});
+
+		// Get the header buffer - always 12 bytes
+		const headerBuffer = responseHeader.getHeaderBuffer();
+
+		// Prepare question section
+		const questionBuffers: Buffer[] = [];
+
+		// Build answers
 		const answers: DNSAnswerType[] = questions.map((q) => ({
 			name: q.name,
 			type: 1, // A record
@@ -53,45 +73,36 @@ udpSocket.on("message", (data: Buffer, remote: dgram.RemoteInfo) => {
 			data: "8.8.8.8",
 		}));
 
-		// ───── Step 4: Construct Header for Response ─────
-		const responseHeader = new DNSHeader();
-		responseHeader.writeHeader({
-			...parsedHeader,
-			qr: 1, // Response
-			rcode: 4, // Not Implemented
-			ancount: answers.length,
-		});
-		const headerBuffer = responseHeader.getHeaderBuffer();
+		const answerBuffers: Buffer[] = [];
 
-		// ───── Step 5: Encode Question Section ─────
-		const questionBuffers = questions.map((q) => {
+		// Create the overall response buffer
+		// IMPORTANT: In this fixed implementation, we do NOT use compression
+		// in the question section of the response to avoid issues with dig
+		for (let i = 0; i < questions.length; i++) {
+			// Encode question (without compression)
 			const question = new DNSQuestion();
-			question.writeQuestion(q);
-			return question.getQuestionBuffer();
-		});
+			question.writeQuestion(questions[i]);
+			questionBuffers.push(question.getQuestionBuffer());
 
-		// ───── Step 6: Encode Answer Section ─────
-		const answerBuffers = answers.map((ans) => {
+			// Encode answer (without compression)
 			const answer = new DNSAnswer();
-			answer.writeAnswer(ans);
-			return answer.getAnswerBuffer();
-		});
+			answer.writeAnswer(answers[i]);
+			answerBuffers.push(answer.getAnswerBuffer());
+		}
 
-		// ───── Step 7: Send the Response ─────
+		// Combine all buffers
 		const response = Buffer.concat([
 			headerBuffer,
 			...questionBuffers,
 			...answerBuffers,
 		]);
+
+		// ───── Step 4: Send Response ─────
 		udpSocket.send(response, remote.port, remote.address);
 
 		// ───── Logs ─────
-		console.log("Parsed Questions:", questions);
 		console.log("Sent Response with", answers.length, "Answer(s)");
-		console.log("Response Buffer:", response);
-		console.log("Response Sent to:", remote.address, ":", remote.port);
 		console.log("Response Buffer Length:", response.length);
-		console.log("Response Buffer (UTF-8):", response.toString("utf-8"));
 	} catch (err) {
 		console.error("Error processing DNS query:", err);
 	}

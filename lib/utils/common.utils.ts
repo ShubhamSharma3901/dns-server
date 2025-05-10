@@ -6,27 +6,36 @@
  */
 
 // Constants for DNS compression
-const POINTER_MASK = 0xc0; // 1100 0000 in binary - indicates compression pointer
-const POINTER_VALUE_MASK = 0x3fff; // Mask to extract the pointer value (14 bits)
+const POINTER_MASK = 0b1100_0000; // 1100 0000 in binary - indicates compression pointer
 
+const isPointer = (byte: number): boolean => {
+	return (byte & POINTER_MASK) === POINTER_MASK;
+};
+
+const extractPointer = (
+	byte: number,
+	buffer: Buffer,
+	offset: number
+): number => {
+	return ((byte & ~POINTER_MASK) << 8) | buffer.readUInt8(offset);
+};
 /**
  * Encodes a domain name with compression support
  * @param name The domain name to encode
- * @param nameMap Optional map of already encoded names for compression
- * @param startOffset Optional starting offset in the overall message
+ * @param nameMap map of already encoded names for compression
  * @returns Buffer containing the encoded domain name
  */
 export const encodeDomainName = (
 	name: string,
-	nameMap: Map<string, number> = new Map(),
-	startOffset: number = 0
-): Buffer => {
-	const labels = name.split(".");
+	nameMap: Map<string, number>,
+	currentOffset: number
+): { buffer: Buffer; newOffset: number } => {
+	const labels: string[] = name.split(".");
 	const bytes: number[] = [];
-	let currentPosition = startOffset;
+	let currentPosition: number = currentOffset;
 
 	// Store the starting position of this domain name
-	const startPosition = currentPosition;
+	const startPosition: number = currentPosition;
 
 	let i = 0;
 	while (i < labels.length) {
@@ -35,7 +44,7 @@ export const encodeDomainName = (
 
 		if (
 			nameMap.has(remainingName) &&
-			nameMap.get(remainingName)! !== startPosition
+			nameMap.get(remainingName) !== startPosition
 		) {
 			// Use a compression pointer, but never point to ourselves
 			const pointer = nameMap.get(remainingName)!;
@@ -45,7 +54,10 @@ export const encodeDomainName = (
 			if (pointer >= 12 && pointer < startPosition) {
 				bytes.push(POINTER_MASK | ((pointer >> 8) & 0x3f)); // High byte with compression bits
 				bytes.push(pointer & 0xff); // Low byte
-				return Buffer.from(bytes);
+				return {
+					buffer: Buffer.from(bytes),
+					newOffset: currentPosition + 2, // pointer is 2 bytes
+				};
 			}
 		}
 
@@ -53,7 +65,7 @@ export const encodeDomainName = (
 		const label = labels[i];
 
 		// Store this position in the map for future compression
-		if (i === 0) {
+		if (!nameMap.has(remainingName)) {
 			nameMap.set(remainingName, currentPosition);
 		}
 
@@ -72,21 +84,22 @@ export const encodeDomainName = (
 
 	// Null byte to terminate the name
 	bytes.push(0);
-
-	return Buffer.from(bytes);
+	currentPosition++;
+	return {
+		buffer: Buffer.from(bytes),
+		newOffset: currentPosition,
+	};
 };
 
 /**
  * Parses a domain name from a buffer with compression support
  * @param buffer The buffer containing the domain name
- * @param startOffset Optional starting offset in the buffer
- * @param originalBuffer Optional original buffer for compression pointers
+ * @param startOffset starting offset in the buffer
  * @returns The parsed domain name and the new offset
  */
 export const parseDomainNameFromBuffer = (
 	buffer: Buffer,
-	startOffset: number = 0,
-	originalBuffer: Buffer = buffer
+	startOffset: number
 ): { parsedName: string; offset: number } => {
 	const labels: string[] = [];
 	let offset = startOffset;
@@ -98,7 +111,7 @@ export const parseDomainNameFromBuffer = (
 		const labelByte = buffer.readUInt8(offset);
 
 		// Check if this is a pointer (compression)
-		if ((labelByte & POINTER_MASK) === POINTER_MASK) {
+		if (isPointer(labelByte)) {
 			if (jumps >= MAX_JUMPS) {
 				throw new Error(
 					"Too many compression jumps, possible circular reference"
@@ -111,8 +124,7 @@ export const parseDomainNameFromBuffer = (
 			}
 
 			// Extract the 14-bit pointer value
-			const pointerOffset =
-				((labelByte & ~POINTER_MASK) << 8) | buffer.readUInt8(offset + 1);
+			const pointerOffset = extractPointer(labelByte, buffer, offset + 1);
 
 			// Validate pointer offset - must be at least 12 bytes into the message
 			if (pointerOffset < 12 || pointerOffset >= buffer.length) {
@@ -126,12 +138,8 @@ export const parseDomainNameFromBuffer = (
 			offset = pointerOffset;
 			jumps++;
 
-			// Continue parsing from the new location
-			const result = parseDomainNameFromBuffer(
-				originalBuffer,
-				pointerOffset,
-				originalBuffer
-			);
+			// Continue parsing from the new location using Recursion
+			const result = parseDomainNameFromBuffer(buffer, pointerOffset);
 
 			// Add the parsed name from the jump target
 			if (result.parsedName) {
@@ -150,6 +158,13 @@ export const parseDomainNameFromBuffer = (
 
 		// Regular label - read the characters
 		offset++;
+		// console.log("Label Byte: ", labelByte);
+		// console.log("Offset: ", offset);
+		console.log(
+			"Buffer at offset:",
+			offset,
+			buffer.subarray(offset, offset + 10).toString("hex")
+		);
 		if (offset + labelByte > buffer.length) {
 			throw new Error("Label extends beyond buffer");
 		}
@@ -161,3 +176,7 @@ export const parseDomainNameFromBuffer = (
 
 	return { parsedName: labels.join("."), offset };
 };
+
+export function estimateUncompressedNameLength(domain: string): number {
+	return domain.split(".").reduce((acc, label) => acc + label.length + 1, 1); // +1 for length byte per label, and final Null Byte
+}

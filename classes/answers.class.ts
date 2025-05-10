@@ -9,39 +9,45 @@ export class DNSAnswer {
 	/**
 	 * Writes the DNS answer with the provided Buffer Data.
 	 * @param {DNSAnswerType} data - The answer data
-	 * @param {Map<string, number>} nameMap - Optional map for domain name compression
-	 * @param {number} offset - Current position in the overall message for compression
-	 * @returns {void}
+	 * @param {Map<string, number>} nameMap - Map for domain name compression
+	 * @param {number} currentOffset - Current position in the overall message for compression
+	 * @returns {number} Length after writing the answer
 	 */
 	public writeAnswer(
 		data: DNSAnswerType,
-		nameMap: Map<string, number> = new Map(),
-		offset: number = 0
-	): void {
-		// Use the enhanced encodeDomainName function with compression support
-		const name = encodeDomainName(data.name, nameMap);
+		nameMap: Map<string, number>,
+		currentOffset: number
+	): number {
+		const { buffer: name, newOffset } = encodeDomainName(
+			data.name,
+			nameMap,
+			currentOffset
+		);
 		const type = data.type;
 		const classType = data.class;
 		const ttl = data.ttl;
 		const rdlength = data.length;
 
-		// Parse IP address into bytes
 		const rdata = Buffer.from(
 			data.data.split(".").map((octet) => parseInt(octet))
 		);
 
-		const nameLength = name.length;
-		this.answerBuffer = Buffer.alloc(nameLength + 10 + rdlength);
+		this.answerBuffer = Buffer.alloc(name.length + 10 + rdlength);
 
-		// Copy the compressed domain name
 		name.copy(this.answerBuffer, 0);
+		this.answerBuffer.writeUInt16BE(type, name.length);
+		this.answerBuffer.writeUInt16BE(classType, name.length + 2);
+		this.answerBuffer.writeUInt32BE(ttl, name.length + 4);
+		this.answerBuffer.writeUInt16BE(rdlength, name.length + 8);
+		rdata.copy(this.answerBuffer, name.length + 10);
 
-		// Write the rest of the answer record
-		this.answerBuffer.writeUInt16BE(type, nameLength);
-		this.answerBuffer.writeUInt16BE(classType, nameLength + 2);
-		this.answerBuffer.writeUInt32BE(ttl, nameLength + 4);
-		this.answerBuffer.writeUInt16BE(rdlength, nameLength + 8);
-		rdata.copy(this.answerBuffer, nameLength + 10);
+		if (name[0] >= 0xc0) {
+			console.log(`[Compression] Pointer used for name '${data.name}'`);
+		} else {
+			console.log(`[No Compression] Name encoded fully for '${data.name}'`);
+		}
+
+		return this.answerBuffer.length;
 	}
 
 	/**

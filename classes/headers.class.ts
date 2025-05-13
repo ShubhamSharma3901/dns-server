@@ -1,8 +1,19 @@
 import type { DNSHeaderType } from "../types/headers";
 export class DNSHeader {
 	private headerBuffer: Uint16Array = new Uint16Array(6);
-
+	private static instance: DNSHeader = new DNSHeader();
 	constructor() {}
+
+	/**
+	 * Returns the singleton instance of DNSHeader.
+	 * @returns {DNSHeader} The singleton instance of DNSHeader.
+	 */
+	public static getInstance(): DNSHeader {
+		if (!this.instance) {
+			this.instance = new DNSHeader();
+		}
+		return this.instance;
+	}
 
 	/**
 	 * Writes the DNS header with the provided Buffer Data.

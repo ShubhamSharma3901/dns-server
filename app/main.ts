@@ -49,7 +49,7 @@ udpSocket.on("message", (data: Buffer, remote: dgram.RemoteInfo) => {
 		const nameMap = new Map<string, number>();
 
 		// ───── Step 4: Construct Header for Response ─────
-		const responseHeader = new DNSHeader();
+		const responseHeader = DNSHeader.getInstance();
 		responseHeader.writeHeader({
 			...parsedHeader,
 			qr: 1, // Response

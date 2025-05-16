@@ -4,7 +4,6 @@
  * This module implements a DNS server that can forward queries to a resolver
  * and handle multiple questions in a single query.
  */
-
 // External dependencies
 import * as dgram from "dgram";
 

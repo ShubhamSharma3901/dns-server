@@ -1,0 +1,16 @@
+version: "1.0"
+
+services:
+  dns_server:
+    container_name: dns_server
+    build: .
+    image: dns_server:latest
+    ports:
+      - "2053:2053/udp"
+    environment:
+      RESOLVER: 8.8.8.8:53
+    develop:
+      watch:
+        - action: sync
+          path: .
+          target: /app

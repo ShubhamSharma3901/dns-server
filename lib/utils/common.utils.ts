@@ -263,12 +263,12 @@ export function mergeResponses(
 	responseHeader.writeHeader({
 		...parsedHeader,
 		pid: transactionID.readUInt16BE(0),
-		qr: 1, // Response
-		rcode: 4, // No error
+		// qr: 1, // Response
+		// rcode: 4, // No error
 		qdcount: questions.length,
 		ancount: responses.length,
-		nscount: 0,
-		arcount: 0,
+		// nscount: 0,
+		// arcount: 0,
 	});
 	const headerBuffer = responseHeader.getHeaderBuffer();
 

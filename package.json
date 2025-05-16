@@ -3,7 +3,9 @@
 	"description": "",
 	"type": "module",
 	"scripts": {
-		"dev": "bun run app/main.ts"
+		"dev": "bun run app/main.ts",
+		"start": "node ./dist/main.js --resolver 1.1.1.1:53",
+		"build": "bun build app/main.ts --outdir=dist --target=node"
 	},
 	"devDependencies": {
 		"@types/bun": "latest"

@@ -1,17 +1,39 @@
 /**
- * DNS Compression Utilities
+ * DNS Compression Utilities + Common Used Utilities
  *
  * These functions implement DNS message compression according to RFC 1035,
  * with fixes for common compression pointer issues.
  */
 
+import { DNSAnswer } from "../../classes/answers.class";
+import { DNSHeader } from "../../classes/headers.class";
+import { DNSQuestion } from "../../classes/questions.class";
+import type { DNSAnswerType } from "../../types/answers";
+import type { DNSHeaderType } from "../../types/headers";
+import type { QuestionType } from "../../types/questions";
+import { extractAnswerSection } from "./answers.utils";
+import { parseDNSHeader } from "./headers.utils";
+import { parseDNSQuestion } from "./questions.utils";
+import * as dgram from "dgram";
 // Constants for DNS compression
 const POINTER_MASK = 0b1100_0000; // 1100 0000 in binary - indicates compression pointer
 
+/**
+ * Checks if a byte represents a DNS compression pointer
+ * @param byte - The byte to check
+ * @returns {boolean} True if the byte is a compression pointer
+ */
 const isPointer = (byte: number): boolean => {
 	return (byte & POINTER_MASK) === POINTER_MASK;
 };
 
+/**
+ * Extracts the offset value from a compression pointer
+ * @param byte - The first byte of the pointer
+ * @param buffer - The buffer containing the pointer
+ * @param offset - The offset of the second byte
+ * @returns {number} The extracted pointer offset
+ */
 const extractPointer = (
 	byte: number,
 	buffer: Buffer,
@@ -177,6 +199,142 @@ export const parseDomainNameFromBuffer = (
 	return { parsedName: labels.join("."), offset };
 };
 
+/**
+ * Estimates the length of a domain name when uncompressed
+ * @param domain - The domain name to measure
+ * @returns {number} The estimated length in bytes
+ */
 export function estimateUncompressedNameLength(domain: string): number {
-	return domain.split(".").reduce((acc, label) => acc + label.length + 1, 1); // +1 for length byte per label, and final Null Byte
+	return domain.split(".").reduce((acc, label) => acc + label.length + 1, 1); // +1 for length byte per label, and final 0
+}
+
+/**
+ * Parses a complete DNS message
+ * @param data - The buffer containing the DNS message
+ * @returns {Object} Object containing parsed header and questions
+ * @returns {DNSHeaderType} parsedHeader - The parsed DNS header
+ * @returns {QuestionType[]} parsedQuestions - Array of parsed questions
+ */
+export function parseDNS(data: Buffer): {
+	parsedHeader: DNSHeaderType;
+	parsedQuestions: QuestionType[];
+} {
+	// ───── Parse Header ─────
+	const parsedHeader: DNSHeaderType = parseDNSHeader(data);
+	let offset = 12; // DNS header is 12 bytes
+	const parsedQuestions: QuestionType[] = [];
+
+	// ───── Parse All Questions ─────
+	for (let i = 0; i < parsedHeader.qdcount; i++) {
+		// Use the enhanced parsing function with compression support
+		const {
+			name,
+			type,
+			class: qClass,
+			bytesUsed,
+		} = parseDNSQuestion(data, offset);
+		parsedQuestions.push({ name, type, class: qClass });
+		offset += bytesUsed;
+	}
+
+	return { parsedHeader, parsedQuestions };
+}
+
+/**
+ * Merges multiple DNS responses into a single response
+ * @param transactionID - The transaction ID to use in the response
+ * @param parsedHeader - The original query header
+ * @param questions - Array of questions from the original query
+ * @param responses - Array of response buffers from the resolver
+ * @returns {Buffer} The merged response buffer
+ */
+export function mergeResponses(
+	transactionID: Buffer,
+	parsedHeader: DNSHeaderType,
+	questions: QuestionType[],
+	responses: Buffer[]
+) {
+	// ───── Step 1: Construct the Response Message with Compression ─────
+	// Create a compression context (nameMap) for the response message
+	const nameMap = new Map<string, number>();
+
+	// ───── Step 2: Construct Header for Response ─────
+	const responseHeader = DNSHeader.getInstance();
+	responseHeader.writeHeader({
+		...parsedHeader,
+		pid: transactionID.readUInt16BE(0),
+		qr: 1, // Response
+		rcode: 4, // No error
+		qdcount: questions.length,
+		ancount: responses.length,
+		nscount: 0,
+		arcount: 0,
+	});
+	const headerBuffer = responseHeader.getHeaderBuffer();
+
+	// Start of the message, position after header
+	let currentPosition = headerBuffer.length;
+
+	// ───── Step 3: Encode Questions with Compression ─────
+	const questionBuffers = questions.map((q) => {
+		const question = new DNSQuestion();
+		// Pass the nameMap and current position to enable compression
+		const bytesWritten = question.writeQuestion(q, nameMap, currentPosition);
+		const qBuffer = question.getQuestionBuffer();
+		currentPosition += bytesWritten;
+		return qBuffer;
+	});
+
+	// ───── Step 4: Retrieve Answer Buffers from Response sent by Resolver ─────
+	const answers: Buffer[] = responses.map((r) => extractAnswerSection(r));
+
+	// ───── Step 5: Send the Compressed Response ─────
+	const response = Buffer.concat([
+		headerBuffer,
+		...questionBuffers,
+		...answers,
+	]);
+
+	return response;
+}
+
+/**
+ * Forwards a DNS query to an upstream resolver
+ * @param packet - The DNS query packet to forward
+ * @param host - The resolver host address
+ * @param port - The resolver port
+ * @returns {Promise<Buffer>} The resolver's response
+ * @throws {Error} If the query times out or fails
+ */
+export function forwardQuery(
+	packet: Buffer,
+	host: string,
+	port: number
+): Promise<Buffer> {
+	return new Promise((resolve, reject) => {
+		const client = dgram.createSocket("udp4");
+		client.send(packet, port, host, (err) => {
+			if (err) return reject(err);
+		});
+
+		let resolved = false;
+
+		client.on("message", (resp) => {
+			if (!resolved) {
+				resolved = true;
+				client.close();
+				resolve(resp);
+			}
+		});
+
+		setTimeout(() => {
+			if (!resolved) {
+				resolved = true;
+				try {
+					client.close();
+				} catch (_) {}
+				throw new Error("Timeout");
+			}
+		}, 2000);
+	});
 }

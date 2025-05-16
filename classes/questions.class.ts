@@ -1,3 +1,14 @@
+/**
+ * DNS Question Class
+ *
+ * Implements a class for handling DNS question sections according to RFC 1035.
+ * Manages the construction of DNS questions with support for domain name compression.
+ * Each question record contains:
+ * - Domain name (with compression support)
+ * - Type (16 bits)
+ * - Class (16 bits)
+ */
+
 import type { QuestionType } from "../types/questions";
 import { encodeDomainName } from "../lib/utils/common.utils";
 
@@ -9,13 +20,13 @@ export class DNSQuestion {
 	/**
 	 * Writes the DNS Question with the provided Buffer Data.
 	 * @param {QuestionType} question - The question object containing the name, type, and class.
-	 * @param {Map<string, number>} nameMap - Map for domain name compression
-	 * @returns {number} Length after writing the question
+	 * @param {Map<string, number>} nameMap - Optional map for domain name compression
+	 * @returns {number} The new offset after writing the question
 	 */
 	public writeQuestion(
 		question: QuestionType,
-		nameMap: Map<string, number>,
-		currentPosition: number
+		nameMap: Map<string, number> = new Map(),
+		currentPosition: number = 12
 	): number {
 		// Use the enhanced encodeDomainName function with compression support
 		const { buffer: encodedName, newOffset } = encodeDomainName(

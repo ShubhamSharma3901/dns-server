@@ -1,3 +1,17 @@
+/**
+ * DNS Answer Class
+ *
+ * Implements a class for handling DNS answer sections according to RFC 1035.
+ * Manages the construction of DNS answer records with support for domain name compression.
+ * Each answer record contains:
+ * - Domain name (with compression support)
+ * - Type (16 bits)
+ * - Class (16 bits)
+ * - TTL (32 bits)
+ * - RDLength (16 bits)
+ * - RData (variable length)
+ */
+
 import { encodeDomainName } from "../lib/utils/common.utils";
 import type { DNSAnswerType } from "../types/answers";
 
@@ -9,13 +23,13 @@ export class DNSAnswer {
 	/**
 	 * Writes the DNS answer with the provided Buffer Data.
 	 * @param {DNSAnswerType} data - The answer data
-	 * @param {Map<string, number>} nameMap - Map for domain name compression
+	 * @param {Map<string, number>} nameMap - Optional map for domain name compression
 	 * @param {number} currentOffset - Current position in the overall message for compression
-	 * @returns {number} Length after writing the answer
+	 * @returns {number} The new offset after writing the answer
 	 */
 	public writeAnswer(
 		data: DNSAnswerType,
-		nameMap: Map<string, number>,
+		nameMap: Map<string, number> = new Map(),
 		currentOffset: number
 	): number {
 		const { buffer: name, newOffset } = encodeDomainName(

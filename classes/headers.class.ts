@@ -1,12 +1,21 @@
+/**
+ * DNS Header Class
+ *
+ * Implements a singleton class for handling DNS message headers according to RFC 1035.
+ * Manages the 12-byte DNS header structure with support for all standard header fields.
+ */
+
 import type { DNSHeaderType } from "../types/headers";
+
 export class DNSHeader {
 	private headerBuffer: Uint16Array = new Uint16Array(6);
 	private static instance: DNSHeader = new DNSHeader();
+
 	constructor() {}
 
 	/**
-	 * Returns the singleton instance of DNSHeader.
-	 * @returns {DNSHeader} The singleton instance of DNSHeader.
+	 * Returns the singleton instance of DNSHeader
+	 * @returns {DNSHeader} The singleton instance of DNSHeader
 	 */
 	public static getInstance(): DNSHeader {
 		if (!this.instance) {
@@ -16,8 +25,19 @@ export class DNSHeader {
 	}
 
 	/**
-	 * Writes the DNS header with the provided Buffer Data.
-	 * @param {DNSHeaderType}
+	 * Writes DNS header data to the internal buffer
+	 *
+	 * Constructs the header flags by combining various DNS header fields:
+	 * - QR (Query/Response)
+	 * - Opcode
+	 * - AA (Authoritative Answer)
+	 * - TC (Truncation)
+	 * - RD (Recursion Desired)
+	 * - RA (Recursion Available)
+	 * - Z (Reserved)
+	 * - RCODE (Response Code)
+	 *
+	 * @param {DNSHeaderType} data - The DNS header data to write
 	 * @returns {void}
 	 */
 	public writeHeader(data: DNSHeaderType): void {
@@ -42,8 +62,12 @@ export class DNSHeader {
 	}
 
 	/**
-	 * Returns the header buffer as a Buffer object.
-	 * @returns {Buffer} The header buffer.
+	 * Converts the internal header buffer to a Node.js Buffer
+	 *
+	 * The header is written in network byte order (big-endian)
+	 * as required by the DNS protocol specification.
+	 *
+	 * @returns {Buffer} A 12-byte buffer containing the DNS header
 	 */
 	public getHeaderBuffer(): Buffer {
 		const buffer = Buffer.alloc(12);

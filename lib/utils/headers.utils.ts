@@ -1,6 +1,34 @@
+/**
+ * DNS Header Utilities
+ *
+ * Functions for parsing DNS message headers according to RFC 1035.
+ * Provides both complete and selective parsing of DNS headers.
+ */
+
 import type { DNSHeaderType } from "../../types/headers";
 
-//Get the header buffer from the DNS packet
+/**
+ * Parses a complete DNS header from a buffer
+ *
+ * Extracts all header fields from the 12-byte DNS header:
+ * - ID (16 bits)
+ * - Flags (16 bits):
+ *   - QR (1 bit)
+ *   - Opcode (4 bits)
+ *   - AA (1 bit)
+ *   - TC (1 bit)
+ *   - RD (1 bit)
+ *   - RA (1 bit)
+ *   - Z (3 bits)
+ *   - RCODE (4 bits)
+ * - QDCOUNT (16 bits)
+ * - ANCOUNT (16 bits)
+ * - NSCOUNT (16 bits)
+ * - ARCOUNT (16 bits)
+ *
+ * @param buffer - The buffer containing the DNS header
+ * @returns {DNSHeaderType} The parsed header data
+ */
 export const parseDNSHeader = (buffer: Buffer): DNSHeaderType => {
 	const parsedHeaderData: DNSHeaderType = {
 		pid: buffer.readUInt16BE(0),
@@ -21,6 +49,20 @@ export const parseDNSHeader = (buffer: Buffer): DNSHeaderType => {
 	return parsedHeaderData;
 };
 
+/**
+ * Parses a DNS header with selective field values for response generation
+ *
+ * This function is used when constructing DNS responses, where certain fields
+ * need to be set to specific values regardless of the original query:
+ * - Sets QR to 1 (Response)
+ * - Sets AA, TC, RA, and Z to 0
+ * - Sets RCODE based on opcode
+ * - Sets QDCOUNT and ANCOUNT to 1
+ * - Sets NSCOUNT and ARCOUNT to 0
+ *
+ * @param buffer - The buffer containing the original DNS header
+ * @returns {DNSHeaderType} The modified header data for response
+ */
 export const parseDNSHeaderSelective = (buffer: Buffer): DNSHeaderType => {
 	const pid = buffer.readUInt16BE(0);
 	const qr = 1;

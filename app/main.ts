@@ -75,6 +75,9 @@ udpSocket.on("message", async (data: Buffer, remote: dgram.RemoteInfo) => {
 		const transactionID = data.subarray(0, 2);
 		const { parsedHeader, parsedQuestions: questions } = parseDNS(data);
 
+		console.log("Questions:", questions);
+		console.log("Parsed Header:", parsedHeader);
+
 		// Handle single or multiple questions in the query
 		const queries =
 			questions.length === 1

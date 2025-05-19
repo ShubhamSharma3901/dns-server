@@ -68,7 +68,7 @@ export function buildSingleQuestionPacket(
 
 	const { buffer: nameBuffer } = encodeDomainName(question.name, new Map(), 12);
 	let offset = 12;
-	nameBuffer.copy(buffer, offset);
+	nameBuffer.copy(new Uint8Array(buffer), offset);
 	offset += nameBuffer.length;
 
 	buffer.writeUInt16BE(question.type, offset);

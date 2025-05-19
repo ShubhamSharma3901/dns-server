@@ -96,7 +96,7 @@ udpSocket.on("message", async (data: Buffer, remote: dgram.RemoteInfo) => {
 			questions,
 			responses
 		);
-
+		//@ts-ignore
 		udpSocket.send(mergedResponse, remote.port, remote.address);
 	} catch (err) {
 		console.error("Error processing DNS query:", err);

@@ -203,12 +203,8 @@ function mergeResponses(transactionID, parsedHeader, questions, responses) {
   responseHeader.writeHeader({
     ...parsedHeader,
     pid: transactionID.readUInt16BE(0),
-    qr: 1,
-    rcode: 4,
     qdcount: questions.length,
-    ancount: responses.length,
-    nscount: 0,
-    arcount: 0
+    ancount: responses.length
   });
   const headerBuffer = responseHeader.getHeaderBuffer();
   let currentPosition = headerBuffer.length;
@@ -277,7 +273,7 @@ function buildSingleQuestionPacket(header, question) {
   buffer.writeUInt16BE(0, 10);
   const { buffer: nameBuffer } = encodeDomainName(question.name, new Map, 12);
   let offset = 12;
-  nameBuffer.copy(buffer, offset);
+  nameBuffer.copy(new Uint8Array(buffer), offset);
   offset += nameBuffer.length;
   buffer.writeUInt16BE(question.type, offset);
   offset += 2;
@@ -289,7 +285,7 @@ function buildSingleQuestionPacket(header, question) {
 // app/main.ts
 var udpSocket = dgram2.createSocket("udp4");
 var PORT = Number(process.env.PORT) || 2053;
-var HOST = process.env.HOST_NAME || "127.0.0.1";
+var HOST = process.env.HOST_NAME || "0.0.0.0";
 function getResolverConfig() {
   const resolverArgIndex = process.argv.indexOf("--resolver");
   let resolverValue;
@@ -310,6 +306,7 @@ function getResolverConfig() {
   return { resolverHostIP, resolverPort };
 }
 var { resolverHostIP, resolverPort } = getResolverConfig();
+console.log(`Using resolver: ${resolverHostIP}:${resolverPort}`);
 udpSocket.bind(PORT, HOST, () => {
   console.log(`DNS server running at ${HOST}:${PORT}`);
 });
@@ -319,6 +316,8 @@ udpSocket.on("message", async (data, remote) => {
 Received DNS query from ${remote.address}:${remote.port}`);
     const transactionID = data.subarray(0, 2);
     const { parsedHeader, parsedQuestions: questions } = parseDNS(data);
+    console.log("Questions:", questions);
+    console.log("Parsed Header:", parsedHeader);
     const queries = questions.length === 1 ? [data] : questions.map((q) => buildSingleQuestionPacket(parsedHeader, q));
     const responses = await Promise.all(queries.map((q) => forwardQuery(q, resolverHostIP, resolverPort)));
     const mergedResponse = mergeResponses(transactionID, parsedHeader, questions, responses);

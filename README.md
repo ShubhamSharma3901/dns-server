@@ -1,8 +1,4 @@
-# DNS Server – RFC-Compliant, High-Performance, and Redis-Backed
-
-![TypeScript](https://img.shields.io/badge/language-typescript-blue.svg)
-![RFC 1035](https://img.shields.io/badge/RFC-1035-brightgreen)
-![Redis Cloud](https://img.shields.io/badge/Redis-Cloud-red)
+![DNS SERVER BANNER](./docs/Banner.png)
 
 ## 🚀 Executive Summary
 
@@ -14,12 +10,7 @@ This project is a **fully RFC 1035-compliant DNS server** written in TypeScript,
 - **Redis Cloud integration** for ultra-fast DNS caching
 - **Production-ready Docker setup**
 
-> **Why is this impressive?**
->
-> - Deep protocol-level understanding (not just using libraries)
-> - Handles all core DNS packet structures and edge cases
-> - Extensible for advanced DNS features and new RFCs
-> - Clean, modular, and well-documented codebase
+This project is built with protocol-level implementation, robust handling of DNS edge cases, and a modular, extensible codebase suitable for advanced DNS features and future RFCs.
 
 ---
 
@@ -37,9 +28,8 @@ This project is a **fully RFC 1035-compliant DNS server** written in TypeScript,
 
 ## 🏗️ Architecture Overview
 
-```
-Client <--> [UDP Socket] <--> [DNS Packet Parser/Builder] <--> [Cache (Redis Cloud)] <--> [Upstream Resolver]
-```
+![DNS Server Architecture](./docs/dns_server_architecture.png)
+_DNS Server Architecture_
 
 - **app/main.ts**: Entry point, UDP server, query handler
 - **lib/utils/**: Core DNS parsing/building utilities
@@ -55,9 +45,16 @@ Client <--> [UDP Socket] <--> [DNS Packet Parser/Builder] <--> [Cache (Redis Clo
 A DNS message consists of:
 
 - **Header** (12 bytes):
-  - ID, Flags (QR, Opcode, AA, TC, RD, RA, Z, RCODE), QDCOUNT, ANCOUNT, NSCOUNT, ARCOUNT
+  - ID, Flags (QR, Opcode, AA, TC, RD, RA, Z, RCODE), QDCOUNT, ANCOUNT, NSCOUNT, ARCOUNT)
+    ![Header](./docs/Header.png)
 - **Question Section**: One or more questions (domain name, type, class)
+  - ![Question](./docs/Question.png)
 - **Answer Section**: Resource records (name, type, class, TTL, RDLENGTH, RDATA)
+  - ![Answer](./docs/Answer.png)
+- **Message Compression**: The pointer takes the form of a two octet sequence
+  - ![Compression](./docs/Compression.png)
+
+> 💡 Tip: For a detailed explanation of DNS Message Format, see [RFC 1035 Section 4.1](https://datatracker.ietf.org/doc/html/rfc1035#section-4.1).
 
 #### Header Example (see `classes/headers.class.ts`):
 
@@ -129,18 +126,26 @@ class DNSAnswer {
 
 ### Environment Setup
 
-Copy `.env_example` to `.env` and fill in your values:
+You must provide your environment variables for the DNS server. There are two ways to do this:
 
-```env
-HOST_NAME='127.0.0.1'
-PORT=2053
-RESOLVER='8.8.8.8:53'
-# REDIS CLOUD CONFIGURATION
-REDIS_PORT=your_redis_port
-REDIS_HOST=your_redis_host
-REDIS_PASSWORD=your_redis_password
-REDIS_USERNAME=your_redis_username
-```
+1. **Edit the `environment` section in `docker-compose.yml`:**
+
+   - Open `docker-compose.yml` and enter your values under the `environment:` key for the `dns_server` service.
+   - Example:
+     ```yaml
+     environment:
+       HOST_NAME: "127.0.0.1"
+       PORT: 2053
+       RESOLVER: "8.8.8.8:53"
+       REDIS_PORT: your_redis_port
+       REDIS_HOST: your_redis_host
+       REDIS_PASSWORD: your_redis_password
+       REDIS_USERNAME: your_redis_username
+     ```
+
+2. **Or, use a `.env` file:**
+   - Copy `.env_example` to `.env` and fill in your values.
+   - Make sure your `docker-compose.yml` references the `.env` file if you use this method.
 
 ### Build & Run (Recommended: Docker Compose)
 
@@ -193,13 +198,12 @@ Dockerfile, docker-compose.yml
 
 ---
 
-## 💡 Why This Project Stands Out
+## 💡 Technical Highlights
 
-- **Protocol-level mastery**: Not just using libraries, but implementing the protocol
-- **RFC-compliant**: All fields, flags, and compression handled
-- **Production-ready**: Redis Cloud, Docker, modular code
-- **Extensible**: Add new features, RFCs, or record types easily
-- **Recruiter appeal**: Shows deep technical skill, clean code, and real-world readiness
+- Protocol-level DNS implementation from the ground up
+- Strict adherence to RFC 1035, including all fields, flags, and compression
+- Production-oriented: Redis Cloud integration, Docker support, modular architecture
+- Extensible design for new features, RFCs, or record types
 
 ---
 

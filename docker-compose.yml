@@ -1,0 +1,22 @@
+version: "1.0"
+
+services:
+  dns_server:
+    container_name: dns_server
+    build: .
+    image: dns_server:latest
+    ports:
+      - "2053:2053/udp"
+    environment:
+      RESOLVER: 8.8.8.8:53
+      HOST_NAME: "127.0.0.1"
+      PORT: 2053
+      REDIS_PORT: your_redis_port
+      REDIS_HOST: your_redis_host
+      REDIS_PASSWORD: your_redis_password
+      REDIS_USERNAME: your_redis_username
+    develop:
+      watch:
+        - action: sync
+          path: .
+          target: /app

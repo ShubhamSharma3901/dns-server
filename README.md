@@ -1,4 +1,4 @@
-![DNS SERVER BANNER](./docs/Banner.png)
+![DNS SERVER BANNER](./docs/Banner.jpeg)
 
 ## 🚀 Executive Summary
 

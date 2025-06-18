@@ -11,6 +11,7 @@
 	},
 	"type": "module",
 	"dependencies": {
-		"ioredis": "^5.6.1"
+		"ioredis": "^5.6.1",
+		"redis": "^5.5.6"
 	}
 }

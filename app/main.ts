@@ -13,7 +13,9 @@ import {
 	forwardQuery,
 	mergeResponses,
 	parseDNS,
+	resolveWithCache,
 } from "../lib/utils/common.utils";
+import redisClient from "../lib/redis/client.redis";
 
 // Server configuration
 const udpSocket = dgram.createSocket("udp4");
@@ -86,8 +88,12 @@ udpSocket.on("message", async (data: Buffer, remote: dgram.RemoteInfo) => {
 
 		// Forward all queries to resolver and collect responses
 		const responses = await Promise.all(
-			queries.map((q) => forwardQuery(q, resolverHostIP, resolverPort))
+			queries.map((q) => {
+				return resolveWithCache(q, resolverHostIP, resolverPort);
+			})
 		);
+
+		console.log("Responses from resolver:", responses);
 
 		// Merge responses and send back to client
 		const mergedResponse = mergeResponses(

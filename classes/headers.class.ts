@@ -1,7 +1,7 @@
 /**
  * DNS Header Class
  *
- * Implements a singleton class for handling DNS message headers according to RFC 1035.
+ * Implements a class for handling DNS message headers according to RFC 1035.
  * Manages the 12-byte DNS header structure with support for all standard header fields.
  */
 
@@ -9,20 +9,8 @@ import type { DNSHeaderType } from "../types/headers";
 
 export class DNSHeader {
 	private headerBuffer: Uint16Array = new Uint16Array(6);
-	private static instance: DNSHeader = new DNSHeader();
 
 	constructor() {}
-
-	/**
-	 * Returns the singleton instance of DNSHeader
-	 * @returns {DNSHeader} The singleton instance of DNSHeader
-	 */
-	public static getInstance(): DNSHeader {
-		if (!this.instance) {
-			this.instance = new DNSHeader();
-		}
-		return this.instance;
-	}
 
 	/**
 	 * Writes DNS header data to the internal buffer

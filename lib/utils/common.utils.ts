@@ -15,6 +15,7 @@ import { extractAnswerSection } from "./answers.utils";
 import { parseDNSHeader } from "./headers.utils";
 import { parseDNSQuestion } from "./questions.utils";
 import * as dgram from "dgram";
+import redisClient from "../redis/client.redis";
 // Constants for DNS compression
 const POINTER_MASK = 0b1100_0000; // 1100 0000 in binary - indicates compression pointer
 
@@ -259,7 +260,7 @@ export function mergeResponses(
 	const nameMap = new Map<string, number>();
 
 	// ───── Step 2: Construct Header for Response ─────
-	const responseHeader = DNSHeader.getInstance();
+	const responseHeader = new DNSHeader();
 	responseHeader.writeHeader({
 		...parsedHeader,
 		pid: transactionID.readUInt16BE(0),
@@ -336,5 +337,76 @@ export function forwardQuery(
 				throw new Error("Timeout");
 			}
 		}, 2000);
+	});
+}
+export function cacheResponse(
+	key: string,
+	response: DNSAnswerType,
+	expirationTime: number
+): Promise<void> {
+	return new Promise((resolve, reject) => {
+		redisClient.set(
+			key,
+			JSON.stringify(response),
+			"EX",
+			expirationTime,
+			(err) => {
+				if (err) {
+					console.error("Error caching response:", err);
+					reject(err);
+				} else {
+					resolve();
+				}
+			}
+		);
+	});
+}
+
+export function getCachedResponse(key: string): Promise<Buffer | null> {
+	return new Promise((resolve, reject) => {
+		redisClient.get(key, (err, result) => {
+			if (err) {
+				console.error("Error retrieving cached response:", err);
+				reject(err);
+			} else if (result) {
+				resolve(Buffer.from(result));
+			} else {
+				resolve(null);
+			}
+		});
+	});
+}
+
+export async function resolveWithCache(
+	q: Buffer,
+	resolverHostIP: string,
+	resolverPort: number
+): Promise<Buffer> {
+	const questionName = q.subarray(12, q.length - 4);
+	const questionType = q.readUInt16BE(q.length - 4);
+	const cacheKey = `${questionName.toString("utf-8")}: ${questionType}`;
+	// console.log("cacheKey: ", cacheKey, ": ", questionType);
+	// Check if the response is cached
+	const cachedResponse = await redisClient.get(cacheKey);
+
+	if (cachedResponse) {
+		console.log("Cache hit for key:", cacheKey);
+		const bufferResponse = Buffer.from(cachedResponse, "base64");
+		console.log("Cached Response: ", bufferResponse);
+		return new Promise((resolve, reject) => {
+			resolve(bufferResponse);
+		});
+	}
+	// If not cached, forward the query to the resolver
+	// and cache the response
+
+	const response = await forwardQuery(q, resolverHostIP, resolverPort);
+
+	await redisClient.set(cacheKey, response.toString("base64"), "EX", 60 * 60); // Cache for 1 hour
+	console.log("Cache miss for key:", cacheKey);
+	console.log("Response: ", response);
+
+	return new Promise((resolve, reject) => {
+		resolve(response);
 	});
 }
